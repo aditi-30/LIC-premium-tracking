@@ -1,0 +1,6 @@
+[build]
+  publish = "."
+
+# Run daily reminder every day at 9:00 AM IST (3:30 AM UTC)
+[functions."daily-reminder"]
+  schedule = "30 3 * * *"

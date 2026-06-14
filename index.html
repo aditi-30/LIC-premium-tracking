@@ -21,6 +21,7 @@
   .btn-add { background: #ffb300; color: #1a237e; border: none; border-radius: 8px; padding: 11px 20px; font-weight: 700; cursor: pointer; font-size: 15px; }
   .btn-notif { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 10px 13px; cursor: pointer; font-size: 16px; }
   .btn-notif.enabled { background: #ffb300; color: #1a237e; border-color: #ffb300; }
+  .btn-test { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 9px 13px; cursor: pointer; font-size: 13px; font-weight: 600; }
 
   /* STATS */
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; }
@@ -116,7 +117,7 @@
       <div class="header-title">Premium Tracker</div>
     </div>
     <div class="header-btns">
-      <button class="btn-notif" id="btn-notif" onclick="requestNotifPermission()" title="Enable Reminders">🔔</button>
+      <button class="btn-test" onclick="sendTestNotif()" title="Send test push notification">Test 🔔</button>
       <button class="btn-add" onclick="openForm()">+ Add Member</button>
     </div>
   </div>
@@ -210,10 +211,10 @@
   let members = JSON.parse(localStorage.getItem('lic-members') || '[]');
   let currentFilter = 'All';
   let editId = null;
-  let swReg = null;
+  let syncTimeout = null;
 
   /* ── Helpers ── */
-  function save() { localStorage.setItem('lic-members', JSON.stringify(members)); }
+  function save() { localStorage.setItem('lic-members', JSON.stringify(members)); scheduleSyncToNetlify(); }
 
   function getDays(dateStr) {
     if (!dateStr) return null;
@@ -402,85 +403,53 @@
     save(); renderAll();
   }
 
-  /* ── Push Notifications ── */
+  /* ── Sync members to Netlify env (so daily function can read them) ── */
+  async function syncToNetlify() {
+    try {
+      await fetch('/.netlify/functions/save-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(members)
+      });
+      console.log('Synced', members.length, 'members to Netlify');
+    } catch(e) {
+      console.warn('Sync failed (ok if running locally):', e.message);
+    }
+  }
+
+  // Debounced sync — waits 2s after last change before syncing
+  function scheduleSyncToNetlify() {
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(syncToNetlify, 2000);
+  }
+
+  /* ── Test notification button ── */
+  async function sendTestNotif() {
+    showBanner('📤 Sending test notification…', 'info');
+    try {
+      const res = await fetch('/.netlify/functions/test-notif', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 1) {
+        showBanner('✅ Test notification sent! Check your Pushover app.', 'success');
+      } else {
+        showBanner('❌ Failed: ' + (data.errors || []).join(', '), 'info');
+      }
+    } catch(e) {
+      showBanner('❌ Could not reach notification server.', 'info');
+    }
+  }
+
   function showBanner(msg, type = 'info') {
     const b = document.getElementById('notif-banner');
     b.textContent = msg;
     b.className = `notif-banner ${type}`;
-    setTimeout(() => b.classList.add('hidden'), 5000);
-  }
-
-  async function registerSW() {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      swReg = await navigator.serviceWorker.register('/sw.js');
-      console.log('SW registered');
-    } catch(e) { console.warn('SW failed', e); }
-  }
-
-  async function requestNotifPermission() {
-    if (!('Notification' in window)) {
-      showBanner('⚠️ Notifications not supported in this browser.', 'info');
-      return;
-    }
-    if (Notification.permission === 'granted') {
-      triggerNotifCheck();
-      showBanner('🔔 Reminders already enabled! Checking now…', 'success');
-      return;
-    }
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      document.getElementById('btn-notif').classList.add('enabled');
-      showBanner('✅ Reminders enabled! You\'ll be notified for premiums due within 7 days.', 'success');
-      triggerNotifCheck();
-    } else {
-      showBanner('❌ Permission denied. Enable notifications in your browser settings.', 'info');
-    }
-  }
-
-  function triggerNotifCheck() {
-    if (Notification.permission !== 'granted') return;
-    if (swReg && swReg.active) {
-      swReg.active.postMessage({ type: 'CHECK_PREMIUMS', members });
-    } else {
-      // Fallback: direct browser notifications
-      const today = new Date(); today.setHours(0,0,0,0);
-      members.forEach(m => {
-        if (m.paid || !m.dueDate) return;
-        const due = new Date(m.dueDate); due.setHours(0,0,0,0);
-        const days = Math.ceil((due - today) / 86400000);
-        if (days >= 0 && days <= 7) {
-          new Notification('🔔 LIC Premium Due Soon', {
-            body: `${m.name}'s premium of ${fmtINR(m.premium)} is due in ${days === 0 ? 'today!' : days + ' day(s).'}`,
-            icon: '/icon.png',
-            tag: 'lic-' + m.id
-          });
-        }
-      });
-    }
-  }
-
-  // Daily check when tab is opened
-  function scheduleDailyCheck() {
-    if (Notification.permission === 'granted') {
-      triggerNotifCheck();
-      // Also check every hour while tab is open
-      setInterval(triggerNotifCheck, 60 * 60 * 1000);
-    }
-  }
-
-  function updateNotifButton() {
-    if (Notification.permission === 'granted') {
-      document.getElementById('btn-notif').classList.add('enabled');
-      document.getElementById('btn-notif').title = 'Reminders Active';
-    }
+    setTimeout(() => b.classList.add('hidden'), 6000);
   }
 
   /* ── Init ── */
-  registerSW();
   renderAll();
-  updateNotifButton();
-  scheduleDailyCheck();
+  // Sync on load so Netlify always has latest data
+  syncToNetlify();
 </script>
 </body>
 </html>
