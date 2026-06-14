@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LIC Premium Tracker</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#1a237e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; min-height: 100vh; padding-bottom: 48px; font-size: 16px; }
+
+  /* HEADER */
+  .header { background: linear-gradient(135deg, #1a237e 0%, #283593 60%, #3949ab 100%); color: #fff; padding: 22px 18px 18px; border-bottom: 3px solid #ffb300; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .header-eyebrow { font-size: 11px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 5px; text-transform: uppercase; }
+  .header-title { font-size: 22px; font-weight: 800; }
+  .header-btns { display: flex; gap: 8px; align-items: center; }
+  .btn-add { background: #ffb300; color: #1a237e; border: none; border-radius: 8px; padding: 11px 20px; font-weight: 700; cursor: pointer; font-size: 15px; }
+  .btn-notif { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 10px 13px; cursor: pointer; font-size: 16px; }
+  .btn-notif.enabled { background: #ffb300; color: #1a237e; border-color: #ffb300; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; }
+  .stat-card { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 8px; text-align: center; }
+  .stat-num { font-size: 26px; font-weight: 800; }
+  .stat-label { font-size: 11px; opacity: 0.8; margin-top: 3px; }
+
+  /* NOTIF BANNER */
+  .notif-banner { margin: 14px 16px 0; padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .notif-banner.info { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+  .notif-banner.success { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+  .notif-banner.hidden { display: none; }
+
+  /* BODY */
+  .body { padding: 16px; }
+
+  /* SEARCH + FILTER */
+  .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .search-input { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #cbd5e0; font-size: 16px; outline: none; }
+  .filter-row { display: flex; gap: 7px; flex-wrap: wrap; }
+  .filter-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .filter-btn.active { background: #1a237e; color: #fff; font-weight: 700; border-color: #1a237e; }
+
+  /* MEMBER CARDS */
+  .members-list { display: flex; flex-direction: column; gap: 12px; }
+  .member-card { border-radius: 14px; padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; border: 1.5px solid; }
+  .card-paid    { background: #f0fff4; border-color: #68d391; }
+  .card-overdue { background: #fff5f5; border-color: #fc8181; }
+  .card-urgent  { background: #fffaf0; border-color: #f6ad55; }
+  .card-upcoming{ background: #ebf8ff; border-color: #63b3ed; }
+  .card-ok      { background: #fff;    border-color: #e2e8f0; }
+
+  .card-left { flex: 1; min-width: 180px; }
+  .card-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card-name { font-weight: 700; font-size: 17px; color: #1a202c; }
+  .badge { font-size: 12px; border-radius: 20px; padding: 3px 11px; font-weight: 600; }
+  .badge-paid     { background: #c6f6d5; color: #276749; }
+  .badge-overdue  { background: #fed7d7; color: #c53030; }
+  .badge-urgent   { background: #feebc8; color: #c05621; }
+  .badge-upcoming { background: #bee3f8; color: #2b6cb0; }
+  .badge-ok       { background: #edf2f7; color: #4a5568; }
+
+  .card-meta { margin-top: 7px; font-size: 13px; color: #718096; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .card-meta b { color: #2d3748; }
+  .card-due { margin-top: 6px; font-size: 13px; color: #718096; }
+  .card-due b { color: #2d3748; }
+
+  .card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+  .card-amount { font-size: 20px; font-weight: 800; color: #1a237e; white-space: nowrap; }
+  .card-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-paid { padding: 7px 13px; border-radius: 7px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .btn-edit, .btn-del { padding: 7px 11px; border-radius: 7px; font-size: 13px; cursor: pointer; border: 1px solid #cbd5e0; background: #fff; }
+  .btn-del { border-color: #fed7d7; background: #fff5f5; color: #c53030; }
+
+  /* TOTAL BAR */
+  .total-bar { margin-top: 20px; background: #1a237e; color: #fff; border-radius: 10px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .total-bar-label { font-size: 14px; opacity: 0.8; }
+  .total-bar-amount { font-size: 22px; font-weight: 800; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 56px 16px; color: #a0aec0; }
+  .empty-icon { font-size: 44px; }
+  .empty-text { margin-top: 14px; font-size: 16px; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; }
+  .modal-title { font-size: 19px; font-weight: 800; color: #1a237e; margin-bottom: 20px; }
+  .field-label { font-size: 14px; font-weight: 600; color: #4a5568; display: block; margin-bottom: 5px; }
+  .field-input, .field-select { width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid #cbd5e0; font-size: 16px; margin-bottom: 14px; outline: none; font-family: inherit; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .btn-cancel { flex: 1; padding: 13px; border-radius: 8px; border: 1px solid #cbd5e0; background: #f7fafc; color: #4a5568; font-size: 15px; cursor: pointer; }
+  .btn-save   { flex: 1; padding: 13px; border-radius: 8px; border: none; background: #1a237e; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+  .hidden { display: none !important; }
+  .section-divider { font-size: 11px; font-weight: 700; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px; margin: 4px 0 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+
+  @media (max-width: 420px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat-num { font-size: 22px; }
+    .field-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-eyebrow">LIC Agent Dashboard</div>
+      <div class="header-title">Premium Tracker</div>
+    </div>
+    <div class="header-btns">
+      <button class="btn-notif" id="btn-notif" onclick="requestNotifPermission()" title="Enable Reminders">🔔</button>
+      <button class="btn-add" onclick="openForm()">+ Add Member</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total Members</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#81d4fa" id="stat-upcoming">0</div><div class="stat-label">Upcoming (30d)</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#ff8a65" id="stat-overdue">0</div><div class="stat-label">Overdue</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#a5d6a7" id="stat-paid">0</div><div class="stat-label">Paid This Cycle</div></div>
+  </div>
+</div>
+
+<!-- NOTIFICATION BANNER -->
+<div class="notif-banner hidden" id="notif-banner"></div>
+
+<!-- BODY -->
+<div class="body">
+  <div class="controls">
+    <input class="search-input" type="text" placeholder="Search by name, policy no, phone…" oninput="renderAll()" id="search-input" />
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('All',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('Upcoming',this)">Upcoming</button>
+      <button class="filter-btn" onclick="setFilter('Overdue',this)">Overdue</button>
+      <button class="filter-btn" onclick="setFilter('Paid',this)">Paid</button>
+    </div>
+  </div>
+
+  <div class="members-list" id="members-list"></div>
+  <div class="empty hidden" id="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-text">No members found. Tap + Add Member to get started!</div>
+  </div>
+  <div class="total-bar hidden" id="total-bar">
+    <div class="total-bar-label" id="total-bar-label">Total Premium</div>
+    <div class="total-bar-amount" id="total-bar-amount">₹0</div>
+  </div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">Add New Member</div>
+
+    <div class="section-divider">Personal Details</div>
+    <label class="field-label">Member Name *</label>
+    <input class="field-input" id="f-name" placeholder="Full name" />
+    <div class="field-row">
+      <div>
+        <label class="field-label">Date of Birth</label>
+        <input class="field-input" id="f-dob" type="date" />
+      </div>
+      <div>
+        <label class="field-label">Phone Number</label>
+        <input class="field-input" id="f-phone" placeholder="Mobile" type="tel" />
+      </div>
+    </div>
+
+    <div class="section-divider">Policy Details</div>
+    <div class="field-row">
+      <div>
+        <label class="field-label">Policy Number</label>
+        <input class="field-input" id="f-policy" placeholder="e.g. 123456789" />
+      </div>
+      <div>
+        <label class="field-label">Plan Name</label>
+        <input class="field-input" id="f-plan" placeholder="e.g. Jeevan Anand" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div>
+        <label class="field-label">Premium Amount (₹) *</label>
+        <input class="field-input" id="f-premium" placeholder="e.g. 5000" type="number" />
+      </div>
+      <div>
+        <label class="field-label">Frequency</label>
+        <select class="field-select" id="f-freq">
+          <option>Monthly</option><option>Quarterly</option><option>Half-Yearly</option><option>Yearly</option>
+        </select>
+      </div>
+    </div>
+    <label class="field-label">Premium Date *</label>
+    <input class="field-input" id="f-due" type="date" />
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeForm()">Cancel</button>
+      <button class="btn-save" onclick="saveForm()">Add Member</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let members = JSON.parse(localStorage.getItem('lic-members') || '[]');
+  let currentFilter = 'All';
+  let editId = null;
+  let swReg = null;
+
+  /* ── Helpers ── */
+  function save() { localStorage.setItem('lic-members', JSON.stringify(members)); }
+
+  function getDays(dateStr) {
+    if (!dateStr) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due = new Date(dateStr); due.setHours(0,0,0,0);
+    return Math.ceil((due - today) / 86400000);
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function fmtAge(dob) {
+    if (!dob) return null;
+    const diff = Date.now() - new Date(dob).getTime();
+    return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  }
+
+  function fmtINR(n) { return '₹' + parseFloat(n).toLocaleString('en-IN'); }
+
+  function getUrgency(m) {
+    if (m.paid) return 'paid';
+    const d = getDays(m.dueDate);
+    if (d === null) return 'ok';
+    if (d < 0) return 'overdue';
+    if (d <= 7) return 'urgent';
+    if (d <= 30) return 'upcoming';
+    return 'ok';
+  }
+
+  function getBadgeText(m) {
+    if (m.paid) return '✓ Paid';
+    const d = getDays(m.dueDate);
+    if (d === null) return '';
+    if (d < 0) return Math.abs(d) + 'd overdue';
+    if (d === 0) return 'Due today!';
+    return d + 'd left';
+  }
+
+  /* ── Render ── */
+  function renderAll() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const list = document.getElementById('members-list');
+    const empty = document.getElementById('empty-state');
+    const totalBar = document.getElementById('total-bar');
+
+    document.getElementById('stat-total').textContent = members.length;
+    document.getElementById('stat-paid').textContent = members.filter(m => m.paid).length;
+    document.getElementById('stat-overdue').textContent = members.filter(m => !m.paid && getDays(m.dueDate) < 0).length;
+    document.getElementById('stat-upcoming').textContent = members.filter(m => !m.paid && getDays(m.dueDate) >= 0 && getDays(m.dueDate) <= 30).length;
+
+    const filtered = members.filter(m => {
+      const s = (m.name + (m.policyNo||'') + (m.phone||'')).toLowerCase();
+      if (!s.includes(search)) return false;
+      const d = getDays(m.dueDate);
+      if (currentFilter === 'Paid') return m.paid;
+      if (currentFilter === 'Overdue') return !m.paid && d !== null && d < 0;
+      if (currentFilter === 'Upcoming') return !m.paid && d !== null && d >= 0 && d <= 30;
+      return true;
+    });
+
+    list.innerHTML = '';
+    if (filtered.length === 0) {
+      empty.classList.remove('hidden');
+      totalBar.classList.add('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    totalBar.classList.remove('hidden');
+
+    const total = members.reduce((s,m) => s + (parseFloat(m.premium)||0), 0);
+    document.getElementById('total-bar-label').textContent = `Total Premium (all ${members.length} members)`;
+    document.getElementById('total-bar-amount').textContent = fmtINR(total);
+
+    filtered.forEach(m => {
+      const urgency = getUrgency(m);
+      const badgeText = getBadgeText(m);
+      const age = fmtAge(m.dob);
+      const btnPaidStyle = m.paid
+        ? `border:1.5px solid #68d391;background:#fff;color:#276749;`
+        : `border:none;background:#1a237e;color:#fff;`;
+
+      const card = document.createElement('div');
+      card.className = `member-card card-${urgency}`;
+      card.innerHTML = `
+        <div class="card-left">
+          <div class="card-name-row">
+            <span class="card-name">${m.name}</span>
+            <span class="badge badge-${urgency}">${badgeText}</span>
+          </div>
+          <div class="card-meta">
+            ${m.dob ? `<span>🎂 DOB: <b>${fmtDate(m.dob)}</b>${age !== null ? ` (${age} yrs)` : ''}</span>` : ''}
+            ${m.policyNo ? `<span>Policy: <b>${m.policyNo}</b></span>` : ''}
+            ${m.plan ? `<span>Plan: <b>${m.plan}</b></span>` : ''}
+            ${m.phone ? `<span>📞 ${m.phone}</span>` : ''}
+            <span>🔄 ${m.frequency}</span>
+          </div>
+          <div class="card-due">Premium Date: <b>${fmtDate(m.dueDate)}</b>${m.paid && m.paidDate ? `&nbsp;&nbsp;Paid on: <b style="color:#276749">${fmtDate(m.paidDate)}</b>` : ''}</div>
+        </div>
+        <div class="card-right">
+          <div class="card-amount">${fmtINR(m.premium)}</div>
+          <div class="card-actions">
+            <button class="btn-paid" style="${btnPaidStyle}" onclick="togglePaid(${m.id})">${m.paid ? 'Mark Unpaid' : 'Mark Paid'}</button>
+            <button class="btn-edit" onclick="editMember(${m.id})">✏️</button>
+            <button class="btn-del" onclick="deleteMember(${m.id})">🗑️</button>
+          </div>
+        </div>`;
+      list.appendChild(card);
+    });
+  }
+
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  }
+
+  /* ── Form ── */
+  function openForm() {
+    editId = null;
+    document.getElementById('modal-title').textContent = 'Add New Member';
+    document.querySelector('.btn-save').textContent = 'Add Member';
+    ['f-name','f-phone','f-policy','f-plan','f-premium','f-due','f-dob'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-freq').value = 'Monthly';
+    document.getElementById('modal').classList.remove('hidden');
+  }
+
+  function closeForm() { document.getElementById('modal').classList.add('hidden'); }
+
+  function editMember(id) {
+    const m = members.find(x => x.id === id);
+    if (!m) return;
+    editId = id;
+    document.getElementById('modal-title').textContent = 'Edit Member';
+    document.querySelector('.btn-save').textContent = 'Save Changes';
+    document.getElementById('f-name').value = m.name;
+    document.getElementById('f-phone').value = m.phone || '';
+    document.getElementById('f-policy').value = m.policyNo || '';
+    document.getElementById('f-plan').value = m.plan || '';
+    document.getElementById('f-premium').value = m.premium;
+    document.getElementById('f-due').value = m.dueDate;
+    document.getElementById('f-dob').value = m.dob || '';
+    document.getElementById('f-freq').value = m.frequency;
+    document.getElementById('modal').classList.remove('hidden');
+  }
+
+  function saveForm() {
+    const name = document.getElementById('f-name').value.trim();
+    const premium = document.getElementById('f-premium').value.trim();
+    const dueDate = document.getElementById('f-due').value;
+    if (!name || !premium || !dueDate) { alert('Please fill Name, Premium Amount, and Premium Date.'); return; }
+
+    const data = {
+      name,
+      phone: document.getElementById('f-phone').value.trim(),
+      policyNo: document.getElementById('f-policy').value.trim(),
+      plan: document.getElementById('f-plan').value.trim(),
+      dob: document.getElementById('f-dob').value,
+      premium, dueDate,
+      frequency: document.getElementById('f-freq').value
+    };
+
+    if (editId) {
+      const idx = members.findIndex(m => m.id === editId);
+      members[idx] = { ...members[idx], ...data };
+    } else {
+      members.push({ ...data, id: Date.now(), paid: false, paidDate: '' });
+    }
+    save(); closeForm(); renderAll();
+    triggerNotifCheck();
+  }
+
+  function togglePaid(id) {
+    const m = members.find(x => x.id === id);
+    if (!m) return;
+    m.paid = !m.paid;
+    m.paidDate = m.paid ? new Date().toISOString().split('T')[0] : '';
+    save(); renderAll();
+  }
+
+  function deleteMember(id) {
+    if (!confirm('Remove this member?')) return;
+    members = members.filter(m => m.id !== id);
+    save(); renderAll();
+  }
+
+  /* ── Push Notifications ── */
+  function showBanner(msg, type = 'info') {
+    const b = document.getElementById('notif-banner');
+    b.textContent = msg;
+    b.className = `notif-banner ${type}`;
+    setTimeout(() => b.classList.add('hidden'), 5000);
+  }
+
+  async function registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      swReg = await navigator.serviceWorker.register('/sw.js');
+      console.log('SW registered');
+    } catch(e) { console.warn('SW failed', e); }
+  }
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) {
+      showBanner('⚠️ Notifications not supported in this browser.', 'info');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      triggerNotifCheck();
+      showBanner('🔔 Reminders already enabled! Checking now…', 'success');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      document.getElementById('btn-notif').classList.add('enabled');
+      showBanner('✅ Reminders enabled! You\'ll be notified for premiums due within 7 days.', 'success');
+      triggerNotifCheck();
+    } else {
+      showBanner('❌ Permission denied. Enable notifications in your browser settings.', 'info');
+    }
+  }
+
+  function triggerNotifCheck() {
+    if (Notification.permission !== 'granted') return;
+    if (swReg && swReg.active) {
+      swReg.active.postMessage({ type: 'CHECK_PREMIUMS', members });
+    } else {
+      // Fallback: direct browser notifications
+      const today = new Date(); today.setHours(0,0,0,0);
+      members.forEach(m => {
+        if (m.paid || !m.dueDate) return;
+        const due = new Date(m.dueDate); due.setHours(0,0,0,0);
+        const days = Math.ceil((due - today) / 86400000);
+        if (days >= 0 && days <= 7) {
+          new Notification('🔔 LIC Premium Due Soon', {
+            body: `${m.name}'s premium of ${fmtINR(m.premium)} is due in ${days === 0 ? 'today!' : days + ' day(s).'}`,
+            icon: '/icon.png',
+            tag: 'lic-' + m.id
+          });
+        }
+      });
+    }
+  }
+
+  // Daily check when tab is opened
+  function scheduleDailyCheck() {
+    if (Notification.permission === 'granted') {
+      triggerNotifCheck();
+      // Also check every hour while tab is open
+      setInterval(triggerNotifCheck, 60 * 60 * 1000);
+    }
+  }
+
+  function updateNotifButton() {
+    if (Notification.permission === 'granted') {
+      document.getElementById('btn-notif').classList.add('enabled');
+      document.getElementById('btn-notif').title = 'Reminders Active';
+    }
+  }
+
+  /* ── Init ── */
+  registerSW();
+  renderAll();
+  updateNotifButton();
+  scheduleDailyCheck();
+</script>
+</body>
+</html>
